@@ -22,6 +22,7 @@ function voteStr(total, status) {
 
 function identityStr(post) {
   if (post.identity?.name) return chalk.cyan(`@${post.identity.name}`);
+  if (post.identity?.display_name) return chalk.cyan(post.identity.display_name);
   if (post.alias) return chalk.dim(post.alias);
   return chalk.dim('anonymous');
 }
@@ -29,7 +30,7 @@ function identityStr(post) {
 export function formatPost(post, opts = {}) {
   const lines = [];
   const header = [
-    chalk.bold.blue(post.id.slice(0, 8)),
+    chalk.bold.blue(post.id),
     voteStr(post.vote_total, post.vote_status),
     chalk.dim(timeAgo(post.created_at)),
     identityStr(post),
@@ -87,8 +88,9 @@ export function formatDM(msg) {
 
 export function formatDMThread(thread) {
   const lastMsg = thread.messages?.[thread.messages.length - 1];
-  const preview = lastMsg ? lastMsg.text.slice(0, 60) : '';
-  return `${chalk.bold(thread.id.slice(0, 8))}  ${chalk.dim(timeAgo(thread.updated_at))}  ${preview}`;
+  const preview = lastMsg?.text ? lastMsg.text.slice(0, 60) : '';
+  const name = thread.name ? chalk.cyan(thread.name) + '  ' : '';
+  return `${chalk.bold(thread.id)}  ${name}${chalk.dim(timeAgo(thread.updated_at))}  ${preview}`;
 }
 
 export function formatGroup(group) {
@@ -110,12 +112,13 @@ export function formatGroupTable(groups) {
     style: { head: ['cyan'] },
   });
   for (const g of groups) {
+    if (!g) continue;
     table.push([
-      g.name,
-      g.id.slice(0, 8),
+      g.name || g.id || '—',
+      (g.id || '').slice(0, 8),
       g.member_count ?? '—',
       g.membership_type === 'member' ? 'joined' : '—',
-      g.group_join_type,
+      g.group_join_type || '—',
     ]);
   }
   return table.toString();

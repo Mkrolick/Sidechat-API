@@ -30,10 +30,10 @@ groups
         const groupDetails = [];
         for (const m of memberships) {
           try {
-            const g = await client.getGroupMetadata(m.group_id || m.id);
-            groupDetails.push(g);
+            const g = await client.getGroupMetadata(m.groupId);
+            groupDetails.push(g || { id: m.groupId, name: m.groupId, membership_type: 'member' });
           } catch {
-            groupDetails.push({ name: m.group_id || m.id, id: m.group_id || m.id, membership_type: 'member' });
+            groupDetails.push({ name: m.groupId, id: m.groupId, membership_type: 'member' });
           }
         }
         console.log(formatGroupTable(groupDetails));
@@ -164,10 +164,10 @@ groups.action(
       const groupDetails = [];
       for (const m of memberships) {
         try {
-          const g = await client.getGroupMetadata(m.group_id || m.id);
+          const g = await client.getGroupMetadata(m.groupId);
           groupDetails.push(g);
         } catch {
-          groupDetails.push({ name: m.group_id || m.id, id: m.group_id || m.id, membership_type: 'member' });
+          groupDetails.push({ name: m.groupId, id: m.groupId, membership_type: 'member' });
         }
       }
       console.log(formatGroupTable(groupDetails));

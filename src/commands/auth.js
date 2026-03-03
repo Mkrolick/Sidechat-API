@@ -46,7 +46,7 @@ auth
 
       // Set default group from first membership
       if (user.memberships?.length) {
-        const groupId = user.memberships[0].group_id || user.memberships[0].id;
+        const groupId = user.memberships[0].groupId;
         setConfig({ defaultGroupId: groupId });
         spinner.succeed(`Logged in! Default group set.`);
       } else {
