@@ -1,198 +1,231 @@
 # Sidechat-API
 
-A command-line interface and API client for interacting with [Sidechat](https://sidechat.lol/) (and Yik Yak) from your terminal. Built with Node.js, designed to run on a Mac Mini.
+A command-line client for interacting with [Sidechat](https://sidechat.lol/) from your terminal. Built with Node.js and Commander.js, designed to run on macOS.
 
 ## Overview
 
-Sidechat is an anonymous social media platform for college communities, owned by Flower Ave LLC (which also owns Yik Yak). Officially, Sidechat is iOS-only with a limited [web viewer](https://web.sidechat.lol/). This project provides full programmatic access to the Sidechat API via the command line, removing the need for the iOS app.
+Sidechat is an anonymous social media platform for college communities, owned by Flower Ave LLC. Officially, Sidechat is iOS-only with a limited [web viewer](https://web.sidechat.lol/). This project provides programmatic access to the Sidechat API from the command line, removing the need for the iOS app.
 
-This tool leverages [`sidechat.js`](https://micahlindley.com/sidechat.js/), a reverse-engineered API wrapper originally built for the [OffSides](https://github.com/micahlt/offsides) Android client.
+This tool leverages [`sidechat.js`](https://micahlindley.com/sidechat.js/), a reverse-engineered API wrapper originally built for the [OffSides](https://github.com/micahlt/offsides) client.
+
+This is a one-shot CLI: every invocation runs a single command and exits. There is no long-running server or daemon.
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────┐
 │                  CLI Layer                    │
-│  (Commander.js + Inquirer.js + Chalk)         │
+│   (Commander.js + @inquirer/prompts + Chalk)  │
 ├──────────────────────────────────────────────┤
 │              API Client Layer                 │
 │           (sidechat.js wrapper)               │
 ├──────────────────────────────────────────────┤
 │            Auth / Token Storage               │
-│         (macOS Keychain via keytar)           │
+│  (macOS Keychain via the `security` CLI)      │
 ├──────────────────────────────────────────────┤
 │            Sidechat REST API                  │
 │        (api.sidechat.lol / undocumented)      │
 └──────────────────────────────────────────────┘
 ```
 
+Your bearer token is stored in the macOS login keychain using the built-in `security` command-line tool (service name `sidechat-cli`, account `auth-token`) — no third-party keychain library is used. Non-secret preferences (your user ID and default group ID) are written to `~/.config/sidechat/config.json`.
+
 ## Features
 
-### Authentication
-- **SMS Login** — authenticate with your phone number and a 6-digit verification code
-- **Token Login** — pass a bearer token directly for headless/automated use
-- **Secure Storage** — auth tokens stored in macOS Keychain (not plaintext config files)
-- **Email Registration** — register and verify a `.edu` email to join campus communities
+### Authentication (`sidechat auth`)
+- **SMS Login** — authenticate interactively with your phone number and a 6-digit verification code
+- **Age / registration** — for brand-new accounts, prompts for age to complete signup
+- **Secure Storage** — the auth token is stored in the macOS Keychain, not in plaintext files
+- **School-email registration** — register and verify a school email to unlock campus communities
 
 ### Posts & Comments
-- Browse feed by category: **Hot**, **New**, **Top**
-- Create text posts (with optional polls, images, link attachments)
-- Comment and reply to threads
-- Upvote / downvote posts and comments
-- Delete your own posts or comments
-- View your post and comment history
+- Browse the feed by sort order: **hot**, **recent**, **top**
+- Create text posts, optionally anonymous, optionally with a poll, and optionally with DMs/comments disabled
+- View a single post with its comment tree
+- Comment on posts and reply to specific comments
+- Delete your own posts and comments
 
-### Groups & Communities
+### Voting
+- Upvote / downvote / clear your vote on posts and comments
+- Vote on polls by choice index
+
+### Groups & Communities (`sidechat groups`)
 - List your joined groups
 - Explore and search available groups
 - Join or leave groups
-- View group metadata (member count, rules, etc.)
+- View group metadata (member count, join type, etc.)
+- Set a default group so you can omit `--group` on other commands
 
-### Direct Messages
+### Direct Messages (`sidechat dms`)
 - List DM threads
-- Read individual DM conversations
-- Start new DMs (from a post or standalone)
+- Read an individual DM conversation
+- Start a new DM from a post/comment
 - Send messages in existing threads
 
-### Polls
-- Create polls with multiple options
-- Vote on existing polls
-- View poll results
+### Profile (`sidechat profile`)
+- View your own account, or another user's public profile
+- Set your username, bio, and conversation icon (emoji + colors)
+- Check whether a username is available
 
-### Assets
-- Upload images for posts/comments (stored on S3)
-- Browse the asset library (stickers, GIFs)
+### Your Content (`sidechat my`)
+- List your own posts
+- List your own comments
 
-### User Profile
-- View and set username
-- Set profile icon (emoji + colors)
-- Set bio
-- View other users' public profiles
+Most read commands also accept `--json` to print the raw API response instead of the formatted output.
 
 ## Tech Stack
 
 | Component | Library | Purpose |
 |-----------|---------|---------|
 | CLI framework | [Commander.js](https://github.com/tj/commander.js) | Command parsing, subcommands, flags |
-| Interactive prompts | [Inquirer.js](https://github.com/SBoudrias/Inquirer.js) | SMS code input, confirmations, menus |
-| Terminal styling | [Chalk](https://github.com/chalk/chalk) | Colored output, formatting |
+| Interactive prompts | [@inquirer/prompts](https://github.com/SBoudrias/Inquirer.js) | Phone/code input, confirmations |
+| Terminal styling | [Chalk](https://github.com/chalk/chalk) | Colored output |
+| Tables | [cli-table3](https://github.com/cli-table/cli-table3) | Group listings |
+| Spinners | [ora](https://github.com/sindresorhus/ora) | Loading indicators |
 | Sidechat API | [sidechat.js](https://micahlindley.com/sidechat.js/) | Reverse-engineered API wrapper |
-| Credential storage | [keytar](https://github.com/atom/node-keytar) | macOS Keychain integration |
-| Runtime | Node.js 18+ | Required for native `fetch` API |
+| Credential storage | macOS `security` CLI | Keychain access (no external dependency) |
+| Runtime | Node.js 18+ | Required for the native `fetch` API |
 
 ## Prerequisites
 
-- **macOS** (tested on Mac Mini)
-- **Node.js 18+** — `sidechat.js` uses the native Fetch API introduced in Node 18
-- **A Sidechat account** — phone number required for authentication
-- **A `.edu` email** — required to join campus-specific communities (optional for interest-based communities)
+- **macOS** — credential storage shells out to the macOS `security` command; the CLI will not work on Linux or Windows as written.
+- **Node.js 18 or newer** — `sidechat.js` uses the native Fetch API introduced in Node 18. (Developed and tested on Node 22.)
+- **A phone number** — required for the interactive SMS login.
+- **A school email** — required to join campus-specific communities (optional for interest-based communities).
 
 ## Installation
 
 ```bash
 # Clone the repo
-git clone https://github.com/mkrolick/Sidechat-API.git
+git clone https://github.com/Mkrolick/Sidechat-API.git
 cd Sidechat-API
 
 # Install dependencies
 npm install
 
-# Link the CLI globally
+# (Optional) link the CLI globally so `sidechat` is on your PATH
 npm link
 ```
+
+If you skip `npm link`, run the CLI with `node src/index.js <command>` (or `npm start -- <command>`) from the repo directory. All examples below use the `sidechat` command; substitute `node src/index.js` if you did not link it.
+
+## Quick Start
+
+```bash
+# 1. Log in (interactive: prompts for phone number, then the SMS code)
+sidechat auth login
+
+# 2. Browse the hot feed of your default group
+sidechat feed
+
+# 3. Post something
+sidechat post create "Hello from the terminal"
+```
+
+Expected behavior: `sidechat auth login` prompts for your 10-digit phone number, sends an SMS code, prompts for that code, stores the resulting token in your Keychain, and sets your first group as the default. After that, `sidechat feed` prints a formatted list of posts.
 
 ## Usage
 
 ### Authentication
 
 ```bash
-# First-time login via SMS
-sidechat login
-# Prompts for phone number (10 digits, no formatting)
-# Sends SMS code, then prompts for the 6-digit code
+# Interactive SMS login (prompts for phone number, then 6-digit code)
+sidechat auth login
 
-# Login with an existing bearer token
-sidechat login --token <your-bearer-token>
+# Log out and clear the stored token
+sidechat auth logout
 
-# Register a .edu email (required for campus groups)
-sidechat register-email <email@university.edu>
+# Register a school email (required for campus groups)
+sidechat auth register-email you@university.edu
 
-# Check email verification status
-sidechat verify-email
+# Check whether your email has been verified
+sidechat auth verify-email
 ```
 
-### Browsing Posts
+> Note: login is interactive only. There is no `--token` flag; the token is obtained through the SMS flow and then persisted to the Keychain automatically.
+
+### Browsing the Feed
 
 ```bash
-# View hot posts in your default group
+# Hot posts in your default group (sort defaults to "hot")
 sidechat feed
 
-# View posts by category
-sidechat feed --category hot
-sidechat feed --category new
-sidechat feed --category top
+# Choose a sort order: hot, recent, or top
+sidechat feed recent
+sidechat feed top
 
-# View posts in a specific group
-sidechat feed --group <group-id>
+# Browse a specific group
+sidechat feed hot --group <group-id>
 
-# Paginate through posts
-sidechat feed --category hot --cursor <cursor-token>
-
-# View a single post with comments
-sidechat post <post-id>
-
-# View comments on a post
-sidechat comments <post-id>
+# Raw JSON output
+sidechat feed --json
 ```
 
-### Creating Content
+The feed paginates interactively: after each page it asks "Load more?" and fetches the next page if you confirm.
+
+### Posts
 
 ```bash
-# Create a text post
+# View a post and its comments
+sidechat post view <post-id>
+
+# Create a text post in your default group
 sidechat post create "Your anonymous message here"
 
 # Create a post with options
 sidechat post create "Message" --group <group-id> --no-dms --no-comments
 
-# Create a post as non-anonymous (uses your username)
-sidechat post create "Message" --named
+# Post anonymously
+sidechat post create "Message" --anonymous
 
-# Create a poll
-sidechat poll create "Which dining hall?" --options "North,South,East,West"
+# Create a poll (each word/quoted phrase after --poll is a choice)
+sidechat post create "Which dining hall?" --poll North South East West
 
+# Delete one of your posts (asks for confirmation)
+sidechat post delete <post-id>
+```
+
+### Comments
+
+```bash
 # Comment on a post
-sidechat comment <post-id> "Your reply here"
+sidechat comment create <post-id> "Your reply here"
 
 # Reply to a specific comment
-sidechat comment <post-id> "Reply text" --reply-to <comment-id>
+sidechat comment create <post-id> "Reply text" --reply <comment-id>
+
+# Comment anonymously
+sidechat comment create <post-id> "Reply text" --anonymous
+
+# Delete a comment (asks for confirmation)
+sidechat comment delete <comment-id>
 ```
 
 ### Voting
 
 ```bash
-# Upvote a post or comment
-sidechat vote <post-id> up
+# Vote on a post (direction: up, down, or none)
+sidechat vote post <post-id> up
+sidechat vote post <post-id> down
+sidechat vote post <post-id> none
 
-# Downvote
-sidechat vote <post-id> down
+# Vote on a comment
+sidechat vote comment <comment-id> up
 
-# Remove your vote
-sidechat vote <post-id> none
-
-# Vote on a poll
-sidechat poll vote <poll-id> <choice-index>
+# Vote on a poll (choice is a 0-based index)
+sidechat vote poll <poll-id> 0
 ```
 
 ### Direct Messages
 
 ```bash
-# List DM threads
-sidechat dms
+# List DM threads (also the default when you run `sidechat dms`)
+sidechat dms list
 
 # Read a specific thread
 sidechat dms read <thread-id>
 
-# Start a DM from a post
+# Start a DM from a post or comment
 sidechat dms start <post-id> "Hey, great post!"
 
 # Send a message in an existing thread
@@ -202,8 +235,8 @@ sidechat dms send <thread-id> "Your message"
 ### Groups
 
 ```bash
-# List your groups
-sidechat groups
+# List your joined groups (also the default when you run `sidechat groups`)
+sidechat groups list
 
 # Explore available groups
 sidechat groups explore
@@ -211,21 +244,25 @@ sidechat groups explore
 # Search for groups
 sidechat groups search "computer science"
 
-# Join a group
-sidechat groups join <group-id>
+# View group details
+sidechat groups info <group-id>
 
-# Leave a group
+# Join or leave a group
+sidechat groups join <group-id>
 sidechat groups leave <group-id>
 
-# View group info
-sidechat groups info <group-id>
+# Set your default group (used when --group is omitted)
+sidechat groups set-default <group-id>
 ```
 
 ### Profile
 
 ```bash
-# View your profile
-sidechat profile
+# View your own account (also the default when you run `sidechat profile`)
+sidechat profile view
+
+# View another user's public profile
+sidechat profile view <username>
 
 # Set your username
 sidechat profile set-username <username>
@@ -236,8 +273,8 @@ sidechat profile check-username <username>
 # Set your bio
 sidechat profile set-bio "CS major, coffee enthusiast"
 
-# View another user's profile
-sidechat profile view <username>
+# Set your conversation icon (emoji + optional hex colors)
+sidechat profile set-icon 🎓 --primary "#6366f1" --secondary "#a5b4fc"
 ```
 
 ### Your Content
@@ -250,66 +287,6 @@ sidechat my posts
 sidechat my comments
 ```
 
-## Running as a Background Service on Mac Mini
-
-To run the API server persistently on your Mac Mini (e.g., for scheduled posting, monitoring, or webhooks):
-
-### Option A: PM2 (Recommended)
-
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start the service
-pm2 start src/index.js --name sidechat-api
-
-# Auto-start on boot
-pm2 startup
-pm2 save
-
-# Monitor
-pm2 logs sidechat-api
-pm2 status
-```
-
-### Option B: macOS launchd
-
-Create a plist file at `~/Library/LaunchAgents/com.sidechat-api.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.sidechat-api</string>
-    <key>WorkingDirectory</key>
-    <string>/Users/mkrolick/Documents/GitHub/Sidechat-API</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/node</string>
-        <string>src/index.js</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/tmp/sidechat-api.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/sidechat-api-error.log</string>
-</dict>
-</plist>
-```
-
-```bash
-# Load and start the service
-launchctl load ~/Library/LaunchAgents/com.sidechat-api.plist
-
-# Stop
-launchctl unload ~/Library/LaunchAgents/com.sidechat-api.plist
-```
-
 ## Project Structure
 
 ```
@@ -317,109 +294,53 @@ Sidechat-API/
 ├── src/
 │   ├── index.js              # CLI entry point (Commander.js setup)
 │   ├── commands/
-│   │   ├── auth.js            # login, register-email, verify-email
-│   │   ├── feed.js            # feed browsing, post viewing
-│   │   ├── post.js            # create, delete posts
+│   │   ├── auth.js            # login, logout, register-email, verify-email
+│   │   ├── feed.js            # feed browsing
+│   │   ├── post.js            # view, create, delete posts
 │   │   ├── comment.js         # create, delete comments
-│   │   ├── vote.js            # upvote, downvote, poll voting
+│   │   ├── vote.js            # vote on posts, comments, polls
 │   │   ├── dms.js             # direct message operations
 │   │   ├── groups.js          # group management
-│   │   └── profile.js         # user profile operations
-│   ├── lib/
-│   │   ├── client.js          # SidechatAPIClient wrapper
-│   │   ├── auth-store.js      # Keychain token storage (keytar)
-│   │   └── formatter.js       # Terminal output formatting (Chalk)
-│   └── config.js              # Default group, preferences
+│   │   ├── profile.js         # user profile operations
+│   │   └── my.js              # your posts and comments
+│   └── lib/
+│       ├── client.js          # SidechatAPIClient wrapper + group-id resolution
+│       ├── config.js          # ~/.config/sidechat/config.json (userId, defaultGroupId)
+│       ├── keychain.js        # token storage via the macOS `security` CLI
+│       ├── format.js          # terminal output formatting (Chalk + cli-table3)
+│       └── errors.js          # error handling / action wrapper
 ├── package.json
 ├── .gitignore
 └── README.md
 ```
 
-## API Reference (sidechat.js)
+## Known Issues & Limitations
 
-The underlying `sidechat.js` library exposes the following methods through `SidechatAPIClient`:
-
-### Authentication
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `loginViaSMS(phone)` | 10-digit number | Sends SMS verification code |
-| `verifySMSCode(phone, code)` | phone + 6-digit code | Completes login |
-| `setAge(age, registrationID)` | age + reg ID | Required for new accounts |
-| `registerEmail(email)` | email string | Starts email verification |
-| `checkEmailVerification()` | none | Checks if email is verified |
-| `setToken(token)` | auth token object | Manually set auth token |
-
-### Posts
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `getGroupPosts(groupID, category, cursor)` | group + "hot"/"new"/"top" + cursor | Fetch paginated posts |
-| `getPost(postID, includeDeleted)` | post ID + boolean | Fetch a single post |
-| `getPostComments(postID)` | post ID | Get all comments on a post |
-| `createPost(text, groupID, ...)` | text + group + options | Create a new post |
-| `createComment(parentPostID, text, ...)` | parent ID + text + options | Add a comment |
-| `deletePostOrComment(id)` | post/comment ID | Delete your content |
-| `getUserContent(type)` | "posts" or "comments" | Your own content |
-| `setVote(postID, action)` | ID + vote string | Upvote/downvote/unvote |
-
-### Groups
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `getGroupMetadata(groupID)` | group ID | Group info and rules |
-| `getAvailableGroups(onePage)` | boolean | Browse all groups |
-| `searchAvailableGroups(query)` | search string | Search groups by keyword |
-| `setGroupMembership(groupID, isMember)` | ID + boolean | Join or leave |
-| `getCurrentUser()` | none | User info + group list |
-
-### Direct Messages
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `getDMs()` | none | List all DM threads |
-| `getDMThread(id)` | thread ID | Read a specific thread |
-| `startDM(text, clientID, postID, ...)` | message + IDs | Start new DM |
-| `sendDM(chatID, text, ...)` | thread ID + message | Send in existing thread |
-
-### Profile
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `setUsername(userID, username)` | user ID + name | Change username |
-| `checkUsername(username)` | username | Check availability |
-| `setUserIcon(userID, emoji, ...)` | user ID + emoji + colors | Set profile icon |
-| `setUserBio(userID, bio)` | user ID + bio text | Set biography |
-| `getUserProfile(username)` | username | View public profile |
-
-### Assets
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `uploadAsset(uri, mimeType, name)` | file URI + type + name | Upload to S3 |
-| `getAssetLibrary()` | none | Browse stickers/GIFs |
+- **macOS only.** Credential storage uses the macOS `security` CLI (`src/lib/keychain.js`). On other platforms the token cannot be stored or read.
+- **Login is interactive only.** There is no headless/token login flag; you must complete the SMS prompt flow at least once. The token then lives in your Keychain for subsequent commands.
+- **No asset/image upload command.** The underlying `sidechat.js` library can upload images, but this CLI does not currently expose a command for it. Posts are text (plus optional polls).
+- **Undocumented, unofficial API.** Response field names can drift; some formatting may show `—` or blanks if the API shape changes.
 
 ## Important Notes
 
 ### Legal Disclaimer
 This project uses a reverse-engineered, unofficial API. It is **not** affiliated with, endorsed by, or connected to Sidechat or Flower Ave LLC. Use at your own risk. The API could change or break at any time without notice.
 
-### Authentication Requirements
-- **Phone number** is required for initial authentication (SMS-based verification)
-- **`.edu` email** is required to join campus-specific communities
-- Interest-based communities can be joined without a `.edu` email
-
 ### Rate Limiting
 The Sidechat API does not publish rate limits. Be respectful with request frequency to avoid getting your account or IP blocked. When building automations, add reasonable delays between requests.
 
 ### Privacy
-- All posts on Sidechat are anonymous by design
-- This CLI stores your bearer token in the macOS Keychain, not in plaintext files
-- Your phone number is used only for authentication and is not exposed in posts
+- Posts on Sidechat are anonymous by design.
+- This CLI stores your bearer token in the macOS Keychain, not in plaintext files.
+- Your phone number is used only for authentication and is not exposed in posts.
 
 ## Sources & References
 
-- [Sidechat.js Documentation](https://micahlindley.com/sidechat.js/) — Reverse-engineered API wrapper
-- [OffSides](https://github.com/micahlt/offsides) — Third-party Android client built on sidechat.js
-- [SidechatProxy](https://github.com/OrenKohavi/SidechatProxy) — Original reverse-engineering project (archived)
+- [Sidechat.js Documentation](https://micahlindley.com/sidechat.js/) — reverse-engineered API wrapper
+- [OffSides](https://github.com/micahlt/offsides) — third-party client built on sidechat.js
+- [SidechatProxy](https://github.com/OrenKohavi/SidechatProxy) — original reverse-engineering project (archived)
 - [Sidechat Official Site](https://sidechat.lol/)
 - [Sidechat Web](https://web.sidechat.lol/)
-- [Sidechat Wikipedia](https://en.wikipedia.org/wiki/Sidechat)
 - [Commander.js](https://github.com/tj/commander.js) — CLI framework
-- [Inquirer.js](https://github.com/SBoudrias/Inquirer.js) — Interactive prompts
-- [Chalk](https://github.com/chalk/chalk) — Terminal styling
-- [keytar](https://github.com/atom/node-keytar) — macOS Keychain access for Node.js
+- [Inquirer.js / @inquirer/prompts](https://github.com/SBoudrias/Inquirer.js) — interactive prompts
+- [Chalk](https://github.com/chalk/chalk) — terminal styling
